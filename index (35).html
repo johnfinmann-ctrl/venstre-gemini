@@ -1,0 +1,765 @@
+<!DOCTYPE html>
+<html lang="da">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Venstre Syddjurs - PWA Prototype</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+            -webkit-tap-highlight-color: transparent;
+            background-color: #f8fafc;
+        }
+        .hide-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        .hide-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+    </style>
+</head>
+<body class="text-[#0B132B] bg-slate-100">
+
+    <!-- HOVEDCONTAINER (Fungerer fuld skærm på mobil, centreret på desktop) -->
+    <div id="app-root" class="max-w-md mx-auto min-h-screen bg-white flex flex-col relative shadow-xl pb-24">
+        <!-- Dynamisk indhold indlæses her via JS -->
+    </div>
+
+    <script>
+        // --- DESIGN CONFIGURATION (Venstre Blå som primær) ---
+        const COLORS = {
+            primaryBlue: '#1D4ED8', // Venstre Blå
+            darkBlue: '#0B132B',
+            slateBg: '#F1F5F9',
+            accentGreen: '#22C55E',
+            accentOrange: '#F59E0B'
+        };
+
+        // --- GLOBAL APP STATE ---
+        let currentTab = 'hjem';
+        let activeCategory = 'Alle';
+        let subPageId = '';
+        let subPageTitle = '';
+        let isAdminLoggedIn = false;
+        
+        // Redigerings-tilstande for admin-panelet
+        let editingItemType = ''; // 'news', 'events', 'videos', 'static'
+        let editingItemId = null; 
+
+        // --- LOCALSTORAGE & STARTDATA (SEED DATA) ---
+        // Her initialiseres data hvis localStorage er tom. 
+        // TIP FOR FREMTIDEN: Her kan du erstatte fetch/save med Supabase/Firebase API kald!
+        
+        function initData() {
+            if (!localStorage.getItem('vs_news')) {
+                const defaultNews = [
+                    {
+                        id: 1,
+                        category: 'Politik',
+                        title: 'Stærkere sammenhæng mellem land og by i Syddjurs',
+                        text: 'Venstre Syddjurs vil sikre, at vores lokalsamfund fra Nimtofte til Knebel har gode rammer, stærke folkeskoler og velfungerende infrastruktur.',
+                        date: '2026-07-03',
+                        image: 'https://images.unsplash.com/photo-1573164713988-8665fc963095?auto=format&fit=crop&w=600&q=80'
+                    },
+                    {
+                        id: 2,
+                        category: 'Erhverv',
+                        title: 'Nye erhvervsarealer skal tiltrække arbejdspladser',
+                        text: 'Vi skal gøre det nemmere og mere attraktivt at drive virksomhed i Syddjurs Kommune. Mindre bureaukrati og hurtigere sagsbehandling.',
+                        date: '2026-07-01',
+                        image: 'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?auto=format&fit=crop&w=600&q=80'
+                    }
+                ];
+                localStorage.setItem('vs_news', JSON.stringify(defaultNews));
+            }
+
+            if (!localStorage.getItem('vs_events')) {
+                const defaultEvents = [
+                    { id: 1, day: '12', month: 'AUG', title: 'Politisk Sommercafé i Ebeltoft', time: '19:00', location: 'Ebeltoft Kulturhus', desc: 'Kom og hør om vores lokalpolitiske mål og mød byrådsgruppen over en kop kaffe.', date: '2026-08-12' },
+                    { id: 2, day: '05', month: 'SEP', title: 'Debat: Fremtidens folkeskole', time: '17:30', location: 'Rønde Idrætscenter', desc: 'Åben debat om hvordan vi sikrer gode decentrale skoler i hele Syddjurs.', date: '2026-09-05' }
+                ];
+                localStorage.setItem('vs_events', JSON.stringify(defaultEvents));
+            }
+
+            if (!localStorage.getItem('vs_videos')) {
+                const defaultVideos = [
+                    { id: 1, title: 'Velkommen til Venstre Syddjurs - Vores vision', desc: 'Hør formanden og byrådsgruppen fortælle om visionerne for hele Syddjurs Kommune.', url: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ', image: 'https://images.unsplash.com/photo-1540575467063-178a50c2df87?auto=format&fit=crop&w=800&q=80', main: true },
+                    { id: 2, title: 'Kort klip: Investeringer i lokal infrastruktur', desc: 'Hvorfor ordentlige veje og cykelstier hænger sammen med bosætning.', url: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ', image: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&w=300&q=80', main: false }
+                ];
+                localStorage.setItem('vs_videos', JSON.stringify(defaultVideos));
+            }
+
+            if (!localStorage.getItem('vs_contact')) {
+                const defaultContact = {
+                    email: 'kontakt@venstresyddjurs.dk',
+                    website: 'www.venstresyddjurs.dk',
+                    text: 'Du er altid velkommen til at række ud til os med spørgsmål, forslag eller hvis du ønsker at engagere dig i lokalarbejdet.'
+                };
+                localStorage.setItem('vs_contact', JSON.stringify(defaultContact));
+            }
+
+            if (!localStorage.getItem('vs_static_pages')) {
+                const defaultStatic = {
+                    maerkesager: '### Vores 3 Hovedprioriteter for Syddjurs
+
+1. **Ansvarlig økonomi og skattestop:** Vi værner om borgernes penge og vil undgå unødige skattestigninger.
+2. **Decentral og stærk folkeskole:** Skolen skal være tæt på børnene, og vi støtter lokalsamfundene fra Nimtofte til Knebel.
+3. **Grøn omstilling i øjenhøjde:** Vi skal beskytte vores rige natur på Mols og Helgenæs i tæt samarbejde med landbruget.',
+                    byraadet: '### Mød Venstres Byrådsgruppe i Syddjurs
+
+Venstre har pt. stærke repræsentanter i Syddjurs Byråd, som kæmper for borgerne hver dag:
+
+- **Gruppeformand:** [Indsæt Navn] - Udvalg for Plan og Teknik
+- **Byrådsmedlem:** [Indsæt Navn] - Udvalg for Børn og Læring
+- **Byrådsmedlem:** [Indsæt Navn] - Velfærdsudvalget',
+                    bestyrelse: '### Lokalforeningens Bestyrelse
+
+Bestyrelsen leder det organisatoriske arbejde, planlægger kampagner og sikrer tæt kontakt til medlemmerne:
+
+- **Formand:** [Indsæt Navn]
+- **Næstformand:** [Indsæt Navn]
+- **Kasserer:** [Indsæt Navn]
+- **Sekretær:** [Indsæt Navn]',
+                    vu: '### VU Syddjurs / Venstre Ungdom
+
+Venstre Ungdom (VU) er Danmarks mest aktive politiske ungdomsorganisation! I Syddjurs arbejder vi tæt sammen med de unge for at skabe aktiviteter, debatter og fællesskaber.
+
+Vil du høre mere om VU Syddjurs? Kontakt os via denne app eller find os på de sociale medier.',
+                    gdpr: '### Privatlivspolitik / GDPR
+
+Vi passer godt på dine data. Denne app gemmer kun data lokalt på din egen enhed (localStorage) og sporer ikke dine personlige oplysninger.
+
+Når du melder dig ind via eksterne links, gælder Venstres landsorganisations landsdækkende privatlivspolitik.'
+                };
+                localStorage.setItem('vs_static_pages', JSON.stringify(defaultStatic));
+            }
+        }
+
+        // Hjælpefunktioner til datamanagement
+        function getData(key) { return JSON.parse(localStorage.getItem(key)); }
+        function setData(key, data) { localStorage.setItem(key, JSON.stringify(data)); }
+
+        // --- APP RENDERING ---
+        function renderApp() {
+            const root = document.getElementById('app-root');
+            let contentHtml = '';
+
+            // Top Header (vises på alle hovedfaner, undtagen undersider)
+            if (currentTab !== 'mere_page') {
+                contentHtml += `
+                    <div class="p-4 flex justify-between items-center bg-white sticky top-0 z-40 border-b border-slate-100 shadow-xs">
+                        <div class="flex items-center gap-2" onclick="switchTab('hjem')" class="cursor-pointer">
+                            <span class="text-3xl font-black tracking-tighter" style="color: ${COLORS.primaryBlue}">V</span>
+                            <div class="flex flex-col">
+                                <span class="text-[10px] font-black tracking-wider text-slate-400 uppercase leading-none">Venstre</span>
+                                <span class="text-xs font-bold text-[#0B132B] leading-tight">Syddjurs</span>
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-1">
+                            ${isAdminLoggedIn ? `<span class="bg-amber-100 text-amber-800 text-[10px] font-bold px-2 py-0.5 rounded-sm mr-2 flex items-center gap-1"><i data-lucide="shield" class="w-3 h-3"></i>Admin</span>` : ''}
+                            <button class="p-2 hover:bg-slate-100 rounded-full transition relative">
+                                <i data-lucide="bell" class="w-5 h-5 text-slate-700"></i>
+                                <span class="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full"></span>
+                            </button>
+                        </div>
+                    </div>
+                `;
+            }
+
+            // 1. FANEN: HJEM
+            if (currentTab === 'hjem') {
+                const newsList = getData('vs_news');
+                const eventsList = getData('vs_events');
+                const mainNews = newsList[0] || { title: 'Velkommen', text: 'Ingen nyheder oprettet endnu.', image: '', date: '' };
+
+                contentHtml += `
+                    <div class="p-4">
+                        <!-- Stor Hero Nyhed -->
+                        <div class="rounded-3xl overflow-hidden relative shadow-md text-white aspect-[4/5] flex flex-col justify-end p-6 bg-cover bg-center mb-5" 
+                             style="background-image: linear-gradient(to top, rgba(11, 19, 43, 0.95), rgba(11, 19, 43, 0.3)), url('${mainNews.image || 'https://images.unsplash.com/photo-1573164713988-8665fc963095?auto=format&fit=crop&w=600&q=80'}')">
+                            <span class="absolute top-4 left-4 text-xs font-bold uppercase tracking-wider px-2.5 py-1 rounded-md" style="background-color: ${COLORS.primaryBlue}">${mainNews.category || 'Fokus'}</span>
+                            <span class="absolute top-4 right-4 text-xs text-slate-300">${mainNews.date}</span>
+                            
+                            <h2 class="text-2xl font-bold leading-tight mb-2">${mainNews.title}</h2>
+                            <p class="text-sm text-slate-300 mb-4 font-light line-clamp-2">${mainNews.text}</p>
+                            
+                            <button onclick="switchTab('nyt')" class="self-start bg-white text-slate-900 text-sm font-semibold px-5 py-2.5 rounded-full flex items-center gap-2 hover:bg-slate-50 transition shadow-xs">
+                                Læs nyheder <i data-lucide="chevron-right" class="w-4 h-4"></i>
+                            </button>
+                        </div>
+
+                        <!-- Hurtig Info Blå accent (Punkt 1 - Ingen lilla/grøn hovedfarve) -->
+                        <div class="mb-6 p-4 rounded-2xl text-white flex justify-between items-center shadow-xs" style="background-color: ${COLORS.primaryBlue}">
+                            <div class="max-w-[70%]">
+                                <h4 class="font-bold text-sm">Gør en lokal forskel</h4>
+                                <p class="text-[11px] text-blue-100 mt-0.5 opacity-90">Mød os til politiske debatter eller bliv medlem af Venstre Syddjurs.</p>
+                            </div>
+                            <button onclick="openSubPage('medlem', 'Bliv medlem')" class="bg-white text-blue-700 font-bold text-xs px-3 py-2 rounded-xl shrink-0 shadow-sm hover:bg-blue-50 transition">
+                                Bliv medlem
+                            </button>
+                        </div>
+
+                        <!-- Det Sker / Karrusel -->
+                        <div class="mb-2">
+                            <div class="flex justify-between items-center mb-3">
+                                <h3 class="text-base font-bold text-slate-900">Det sker i kommunen</h3>
+                                <button onclick="switchTab('kalender')" class="text-xs font-semibold" style="color: ${COLORS.primaryBlue}">Se alle</button>
+                            </div>
+                            
+                            <div class="flex gap-3 overflow-x-auto pb-2 snap-x hide-scrollbar">
+                                ${eventsList.length === 0 ? '<p class="text-xs text-slate-400 px-1">Ingen planlagte aktiviteter.</p>' : eventsList.map(event => {
+                                    // Lav en simpel månedskonvertering hvis dato findes
+                                    let dDay = event.day || '12';
+                                    let dMån = event.month || 'AUG';
+                                    if(event.date) {
+                                        const d = new Date(event.date);
+                                        if(!isNaN(d)) {
+                                            dDay = d.getDate();
+                                            const mænd = ['JAN','FEB','MAR','APR','MAJ','JUN','JUL','AUG','SEP','OKT','NOV','DEC'];
+                                            dMån = mænd[d.getMonth()];
+                                        }
+                                    }
+                                    return `
+                                    <div class="w-[150px] shrink-0 rounded-2xl p-4 text-white flex flex-col justify-between h-[160px] shadow-xs snap-start bg-gradient-to-br from-blue-700 to-blue-900">
+                                        <div>
+                                            <span class="block text-2xl font-black leading-none">${dDay}</span>
+                                            <span class="text-xs font-bold tracking-wider opacity-80">${dMån}</span>
+                                        </div>
+                                        <div>
+                                            <p class="text-xs font-bold leading-tight mb-1 line-clamp-2">${event.title}</p>
+                                            <span class="text-[9px] bg-black/20 px-1.5 py-0.5 rounded-sm block truncate"><i data-lucide="map-pin" class="w-2 h-2 inline mr-0.5"></i>${event.location}</span>
+                                        </div>
+                                    </div>
+                                    `;
+                                }).join('')}
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+
+            // 2. FANEN: NYHEDER
+            else if (currentTab === 'nyt') {
+                const newsList = getData('vs_news');
+                contentHtml += `
+                    <div class="p-4">
+                        <div class="flex justify-between items-center mb-4">
+                            <h2 class="text-xl font-bold text-slate-900">Lokale Nyheder</h2>
+                            <button class="p-2 hover:bg-slate-100 rounded-full"><i data-lucide="search" class="w-5 h-5 text-slate-700"></i></button>
+                        </div>
+
+                        <div class="space-y-4">
+                            ${newsList.length === 0 ? '<p class="text-sm text-slate-400">Der er pt. ingen lokale nyheder.</p>' : newsList.map(item => `
+                                <div class="bg-white rounded-2xl overflow-hidden shadow-xs border border-slate-100 flex flex-col">
+                                    ${item.image ? `<div class="h-44 bg-cover bg-center" style="background-image: url('${item.image}')"></div>` : ''}
+                                    <div class="p-4">
+                                        <div class="flex justify-between items-center mb-1.5">
+                                            <span class="text-[10px] font-bold uppercase tracking-wider text-blue-600">${item.category}</span>
+                                            <span class="text-xs text-slate-400">${item.date}</span>
+                                        </div>
+                                        <h3 class="font-bold text-slate-900 text-base leading-snug mb-2">${item.title}</h3>
+                                        <p class="text-xs text-slate-600 leading-relaxed mb-3">${item.text}</p>
+                                        
+                                        ${isAdminLoggedIn ? `
+                                            <div class="mt-2 pt-2 border-t border-slate-100 flex gap-2 justify-end">
+                                                <button onclick="openAdminEdit('news', ${item.id})" class="text-xs bg-slate-100 text-slate-700 px-2.5 py-1 rounded-md flex items-center gap-1"><i data-lucide="edit" class="w-3 h-3"></i> Rediger</button>
+                                                <button onclick="deleteItem('news', ${item.id})" class="text-xs bg-red-50 text-red-600 px-2.5 py-1 rounded-md flex items-center gap-1"><i data-lucide="trash" class="w-3 h-3"></i> Slet</button>
+                                            </div>
+                                        ` : ''}
+                                    </div>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                `;
+            }
+
+            // 3. FANEN: KALENDER
+            else if (currentTab === 'kalender') {
+                const eventsList = getData('vs_events');
+                contentHtml += `
+                    <div class="p-4">
+                        <h2 class="text-xl font-bold text-slate-900 mb-2">Aktivitetskalender</h2>
+                        <p class="text-xs text-slate-500 mb-4">Følg med i vores åbne møder, politiske caféer og aktiviteter i Syddjurs.</p>
+                        
+                        <div class="space-y-3">
+                            ${eventsList.length === 0 ? '<p class="text-sm text-slate-400">Ingen planlagte aktiviteter i kalenderen.</p>' : eventsList.map(event => `
+                                <div class="bg-white rounded-2xl p-4 border border-slate-100 shadow-xs flex flex-col">
+                                    <div class="flex gap-3 items-start">
+                                        <div class="w-12 h-12 rounded-xl bg-blue-50 text-blue-700 flex flex-col items-center justify-center font-bold shrink-0">
+                                            <span class="text-base leading-none font-black">${event.day || event.date.split('-')[2] || ''}</span>
+                                            <span class="text-[9px] uppercase tracking-wider">${event.month || 'MÅN'}</span>
+                                        </div>
+                                        <div class="flex-1 min-w-0">
+                                            <h4 class="font-bold text-slate-900 text-sm leading-tight">${event.title}</h4>
+                                            <div class="flex flex-col gap-0.5 mt-1 text-slate-400 text-[11px]">
+                                                <span class="flex items-center gap-1"><i data-lucide="clock" class="w-3 h-3 text-slate-300"></i>Kl. ${event.time}</span>
+                                                <span class="flex items-center gap-1 truncate"><i data-lucide="map-pin" class="w-3 h-3 text-slate-300"></i>${event.location}</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    ${event.desc ? `<p class="text-xs text-slate-600 mt-3 bg-slate-50 p-2.5 rounded-xl border border-slate-100/50">${event.desc}</p>` : ''}
+                                    
+                                    ${isAdminLoggedIn ? `
+                                        <div class="mt-2 pt-2 border-t border-slate-100 flex gap-2 justify-end">
+                                            <button onclick="openAdminEdit('events', ${event.id})" class="text-xs bg-slate-100 text-slate-700 px-2.5 py-1 rounded-md flex items-center gap-1"><i data-lucide="edit" class="w-3 h-3"></i> Rediger</button>
+                                            <button onclick="deleteItem('events', ${event.id})" class="text-xs bg-red-50 text-red-600 px-2.5 py-1 rounded-md flex items-center gap-1"><i data-lucide="trash" class="w-3 h-3"></i> Slet</button>
+                                        </div>
+                                    ` : ''}
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                `;
+            }
+
+            // 4. FANEN: VIDEO
+            else if (currentTab === 'video') {
+                const videosList = getData('vs_videos');
+                const mainVideo = videosList.find(v => v.main) || videosList[0];
+                const otherVideos = videosList.filter(v => v.id !== (mainVideo ? mainVideo.id : null));
+
+                contentHtml += `
+                    <div class="p-4">
+                        <h2 class="text-xl font-bold text-slate-900 mb-4">Video & Taler</h2>
+
+                        ${mainVideo ? `
+                            <!-- Fremhævet video -->
+                            <div class="mb-5 bg-white rounded-2xl overflow-hidden shadow-xs border border-slate-100">
+                                <div class="aspect-video bg-cover bg-center relative flex items-center justify-center" style="background-image: linear-gradient(to top, rgba(0,0,0,0.4), transparent), url('${mainVideo.image || 'https://images.unsplash.com/photo-1540575467063-178a50c2df87?auto=format&fit=crop&w=800&q=80'}')">
+                                    <a href="${mainVideo.url}" target="_blank" class="w-12 h-12 bg-white rounded-full flex items-center justify-center shadow-md text-blue-600 pl-0.5 hover:scale-105 transition">
+                                        <i data-lucide="play" class="w-5 h-5 fill-current" style="color: ${COLORS.primaryBlue}"></i>
+                                    </a>
+                                    <span class="absolute bottom-2.5 right-2.5 bg-black/70 text-white text-[9px] px-1.5 py-0.5 rounded-sm font-mono">${mainVideo.duration || 'KLIP'}</span>
+                                </div>
+                                <div class="p-4">
+                                    <h3 class="font-bold text-slate-900 text-sm mb-1">${mainVideo.title}</h3>
+                                    <p class="text-xs text-slate-500">${mainVideo.desc || ''}</p>
+                                    
+                                    ${isAdminLoggedIn ? `
+                                        <div class="mt-2 pt-2 border-t border-slate-100 flex gap-2 justify-end">
+                                            <button onclick="openAdminEdit('videos', ${mainVideo.id})" class="text-xs bg-slate-100 text-slate-700 px-2.5 py-1 rounded-md flex items-center gap-1"><i data-lucide="edit" class="w-3 h-3"></i> Rediger</button>
+                                            <button onclick="deleteItem('videos', ${mainVideo.id})" class="text-xs bg-red-50 text-red-600 px-2.5 py-1 rounded-md flex items-center gap-1"><i data-lucide="trash" class="w-3 h-3"></i> Slet</button>
+                                        </div>
+                                    ` : ''}
+                                </div>
+                            </div>
+                        ` : ''}
+
+                        ${otherVideos.length > 0 ? `
+                            <h4 class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">Flere videoer</h4>
+                            <div class="space-y-2">
+                                ${otherVideos.map(video => `
+                                    <div class="flex gap-3 bg-white p-2 rounded-xl border border-slate-100 items-center justify-between">
+                                        <div class="flex gap-3 items-center min-w-0">
+                                            <div class="w-20 h-14 bg-cover bg-center rounded-lg shrink-0 flex items-center justify-center relative shadow-xs" style="background-image: url('${video.image}')">
+                                                <a href="${video.url}" target="_blank" class="w-6 h-6 bg-white/95 rounded-full flex items-center justify-center text-slate-900 pl-0.5"><i data-lucide="play" class="w-2.5 h-2.5 fill-current"></i></a>
+                                            </div>
+                                            <div class="min-w-0">
+                                                <h5 class="text-xs font-bold text-slate-900 leading-tight line-clamp-2">${video.title}</h5>
+                                            </div>
+                                        </div>
+                                        
+                                        ${isAdminLoggedIn ? `
+                                            <div class="flex gap-1 shrink-0 ml-2">
+                                                <button onclick="openAdminEdit('videos', ${video.id})" class="p-1 bg-slate-50 rounded-md text-slate-600"><i data-lucide="edit" class="w-3.5 h-3.5"></i></button>
+                                                <button onclick="deleteItem('videos', ${video.id})" class="p-1 bg-red-50 rounded-md text-red-600"><i data-lucide="trash" class="w-3.5 h-3.5"></i></button>
+                                            </div>
+                                        ` : ''}
+                                    </div>
+                                `).join('')}
+                            </div>
+                        ` : ''}
+                    </div>
+                `;
+            }
+
+            // 5. FANEN: MERE (ORGANISATION & MENUPUNKTER)
+            else if (currentTab === 'mere') {
+                // Opdateret menu struktur jf. punkt 2
+                const menuItems = [
+                    { id: 'maerkesager', label: 'Mærkesager', icon: 'award' },
+                    { id: 'byraadet', label: 'Byrådet', icon: 'landmark' },
+                    { id: 'bestyrelse', label: 'Bestyrelse', icon: 'briefcase' },
+                    { id: 'vu', label: 'VU / Venstre Ungdom', icon: 'users' },
+                    { id: 'medlem', label: 'Bliv medlem', icon: 'user-plus' },
+                    { id: 'kontakt', label: 'Kontakt', icon: 'mail' },
+                    { id: 'gdpr', label: 'Privatliv / GDPR', icon: 'shield-check' },
+                    { id: 'admin', label: 'Admin', icon: 'lock' }
+                ];
+
+                // Punkt 1: Ændret til Venstres rene blå farve i stedet for flerfarvet gradient
+                contentHtml += `
+                    <div class="p-4">
+                        <div class="rounded-2xl p-5 text-white mb-5 shadow-sm" style="background-color: ${COLORS.primaryBlue}">
+                            <span class="text-[10px] uppercase font-bold tracking-wider opacity-75">Lokalforeningen</span>
+                            <h2 class="text-xl font-bold mt-0.5">Venstre Syddjurs</h2>
+                            <p class="text-xs text-blue-50 mt-1.5 font-light leading-relaxed">Officiel organisations- og nyhedsapp for Venstre i Syddjurs Kommune.</p>
+                        </div>
+
+                        <div class="space-y-1.5">
+                            ${menuItems.map(item => `
+                                <button onclick="openSubPage('${item.id}', '${item.label}')" class="w-full flex items-center justify-between p-3.5 bg-white hover:bg-slate-50 border border-slate-100 rounded-xl transition text-left active:scale-[0.99]">
+                                    <div class="flex items-center gap-3">
+                                        <div class="w-9 h-9 rounded-lg flex items-center justify-center text-blue-600 shrink-0" style="background-color: ${COLORS.slateBg}">
+                                            <i data-lucide="${item.icon}" class="w-4.5 h-4.5"></i>
+                                        </div>
+                                        <span class="font-bold text-slate-900 text-sm">${item.label}</span>
+                                    </div>
+                                    <i data-lucide="chevron-right" class="w-4 h-4 text-slate-300"></i>
+                                </button>
+                            `).join('')}
+                        </div>
+                    </div>
+                `;
+            }
+
+            // UNDERSIDER TIL MERE-MENU (Punkt 3 - Hver sin rigtige indlæste underside)
+            else if (currentTab === 'mere_page') {
+                contentHtml += `
+                    <div class="p-4 bg-white sticky top-0 z-40 border-b border-slate-100 flex items-center justify-between shadow-xs">
+                        <div class="flex items-center gap-3">
+                            <button onclick="switchTab('mere')" class="p-1.5 hover:bg-slate-100 rounded-full transition">
+                                <i data-lucide="arrow-left" class="w-5 h-5 text-slate-700"></i>
+                            </button>
+                            <h3 class="font-bold text-base text-slate-900">${subPageTitle}</h3>
+                        </div>
+                        ${(isAdminLoggedIn && subPageId !== 'admin' && subPageId !== 'kontakt') ? `
+                            <button onclick="openAdminStaticEdit('${subPageId}', '${subPageTitle}')" class="text-xs font-bold text-amber-700 bg-amber-50 px-2.5 py-1.5 rounded-lg flex items-center gap-1">
+                                <i data-lucide="edit-3" class="w-3.5 h-3.5"></i> Ret tekst
+                            </button>
+                        ` : ''}
+                    </div>
+                    <div class="p-5">
+                        ${renderSubPageContent()}
+                    </div>
+                `;
+            }
+
+            // BUNDNAVIGATION BAR (Fastlåst på alle hovedskærme jf. punkt 9)
+            contentHtml += `
+                <div class="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-white/95 backdrop-blur-md border-t border-slate-100 px-4 pt-2 pb-5 flex justify-between items-center z-50 shadow-lg">
+                    <button onclick="switchTab('hjem')" class="flex flex-col items-center gap-1 flex-1 transition ${currentTab === 'hjem' ? 'font-bold' : 'text-slate-400'}" ${currentTab === 'hjem' ? `style="color: ${COLORS.primaryBlue}"` : ''}>
+                        <i data-lucide="home" class="w-5 h-5"></i><span class="text-[9px]">Hjem</span>
+                    </button>
+                    <button onclick="switchTab('nyt')" class="flex flex-col items-center gap-1 flex-1 transition ${currentTab === 'nyt' ? 'font-bold' : 'text-slate-400'}" ${currentTab === 'nyt' ? `style="color: ${COLORS.primaryBlue}"` : ''}>
+                        <i data-lucide="newspaper" class="w-5 h-5"></i><span class="text-[9px]">Nyheder</span>
+                    </button>
+                    <button onclick="switchTab('kalender')" class="flex flex-col items-center gap-1 flex-1 transition ${currentTab === 'kalender' ? 'font-bold' : 'text-slate-400'}" ${currentTab === 'kalender' ? `style="color: ${COLORS.primaryBlue}"` : ''}>
+                        <i data-lucide="calendar" class="w-5 h-5"></i><span class="text-[9px]">Kalender</span>
+                    </button>
+                    <button onclick="switchTab('video')" class="flex flex-col items-center gap-1 flex-1 transition ${currentTab === 'video' ? 'font-bold' : 'text-slate-400'}" ${currentTab === 'video' ? `style="color: ${COLORS.primaryBlue}"` : ''}>
+                        <i data-lucide="video" class="w-5 h-5"></i><span class="text-[9px]">Video</span>
+                    </button>
+                    <button onclick="switchTab('mere')" class="flex flex-col items-center gap-1 flex-1 transition ${(currentTab === 'mere' || currentTab === 'mere_page') ? 'font-bold' : 'text-slate-400'}" ${(currentTab === 'mere' || currentTab === 'mere_page') ? `style="color: ${COLORS.primaryBlue}"` : ''}>
+                        <i data-lucide="menu" class="w-5 h-5"></i><span class="text-[9px]">Mere</span>
+                    </button>
+                </div>
+            `;
+
+            root.innerHTML = contentHtml;
+            lucide.createIcons();
+        }
+
+        // --- HÅNDTERING AF UNDERSIDER ---
+        function openSubPage(id, title) {
+            subPageId = id;
+            subPageTitle = title;
+            currentTab = 'mere_page';
+            renderApp();
+        }
+
+        function renderSubPageContent() {
+            const staticPages = getData('vs_static_pages');
+            const contactData = getData('vs_contact');
+
+            // Formatér basal linjeskift til simple <br> og afsnit for demovisning
+            const formatText = (txt) => txt ? txt.replace(/
+/g, '<br>') : '';
+
+            if (subPageId === 'kontakt') {
+                return `
+                    <div class="space-y-4 text-sm">
+                        <p class="text-slate-600 leading-relaxed">${formatText(contactData.text)}</p>
+                        
+                        <div class="flex items-center gap-3 p-3.5 border border-slate-100 rounded-xl bg-slate-50/50">
+                            <i data-lucide="mail" class="text-blue-600 w-5 h-5"></i>
+                            <div>
+                                <span class="block text-[10px] text-slate-400 font-medium">E-mailadresse</span>
+                                <span class="font-semibold text-slate-800">${contactData.email}</span>
+                            </div>
+                        </div>
+
+                        <div class="flex items-center gap-3 p-3.5 border border-slate-100 rounded-xl bg-slate-50/50">
+                            <i data-lucide="globe" class="text-blue-600 w-5 h-5"></i>
+                            <div>
+                                <span class="block text-[10px] text-slate-400 font-medium">Hjemmeside</span>
+                                <span class="font-semibold text-slate-800">${contactData.website}</span>
+                            </div>
+                        </div>
+
+                        ${isAdminLoggedIn ? `
+                            <button onclick="openAdminContactEdit()" class="w-full mt-4 py-2.5 bg-amber-50 border border-amber-200 text-amber-800 font-bold text-xs rounded-xl flex items-center justify-center gap-2">
+                                <i data-lucide="edit"></i> Ret kontaktoplysninger
+                            </button>
+                        ` : ''}
+                    </div>
+                `;
+            }
+
+            if (subPageId === 'medlem') {
+                return `
+                    <div class="text-center py-6">
+                        <div class="w-16 h-16 rounded-full mx-auto mb-4 flex items-center justify-center bg-blue-50 text-blue-600">
+                            <i data-lucide="user-plus" class="w-8 h-8"></i>
+                        </div>
+                        <h4 class="font-bold text-slate-900 text-lg mb-2">Bliv en del af Venstre Syddjurs</h4>
+                        <p class="text-xs text-slate-500 leading-relaxed max-w-xs mx-auto mb-6">Som medlem får du direkte indflydelse på vores lokalpolitik, mulighed for at stemme til opstillingsmøder, og støtter det liberale arbejde i Syddjurs.</p>
+                        <a href="https://www.venstre.dk/bliv-medlem" target="_blank" class="block w-full py-3 text-center font-bold text-sm text-white rounded-xl shadow-sm hover:opacity-90 transition" style="background-color: ${COLORS.primaryBlue}">
+                            Gå til officiel indmeldelse
+                        </a>
+                    </div>
+                `;
+            }
+
+            if (subPageId === 'admin') {
+                if (!isAdminLoggedIn) {
+                    return `
+                        <div class="max-w-xs mx-auto py-6">
+                            <h4 class="font-bold text-slate-900 text-center mb-1">Admin Logind</h4>
+                            <p class="text-xs text-slate-400 text-center mb-4">Indtast adgangskode for at redigere appens indhold.</p>
+                            <div class="space-y-3">
+                                <input type="password" id="admin-pass-input" placeholder="Adgangskode" class="w-full p-3 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-blue-500 text-center">
+                                <button onclick="checkAdminPassword()" class="w-full py-2.5 text-white font-bold text-sm rounded-xl" style="background-color: ${COLORS.primaryBlue}">Log ind</button>
+                                <p id="admin-err-msg" class="text-xs text-red-500 text-center hidden font-medium">Forkert adgangskode. Prøv igen.</p>
+                            </div>
+                        </div>
+                    `;
+                }
+
+                // ADMIN DASHBOARD PANELER (Punkt 4, 5, 6, 7, 8)
+                return `
+                    <div class="space-y-5">
+                        <div class="bg-amber-50 border border-amber-200 p-3 rounded-xl flex justify-between items-center">
+                            <span class="text-xs font-bold text-amber-900">Du er logget på som Admin</span>
+                            <button onclick="isAdminLoggedIn=false; renderApp();" class="text-xs bg-white text-slate-600 border border-slate-200 px-2 py-1 rounded-md font-medium">Log ud</button>
+                        </div>
+
+                        <!-- Opret elementer -->
+                        <div class="bg-slate-50 p-4 rounded-2xl border border-slate-100 space-y-2">
+                            <h4 class="font-bold text-xs uppercase tracking-wider text-slate-400 mb-2">Opret nyt indhold</h4>
+                            <button onclick="openAdminCreate('news')" class="w-full text-left p-3 bg-white border border-slate-100 rounded-xl text-xs font-bold flex items-center gap-2 text-slate-700 shadow-2xs"><i data-lucide="plus-circle" class="text-blue-600 w-4 h-4"></i> Opret lokal nyhed</button>
+                            <button onclick="openAdminCreate('events')" class="w-full text-left p-3 bg-white border border-slate-100 rounded-xl text-xs font-bold flex items-center gap-2 text-slate-700 shadow-2xs"><i data-lucide="plus-circle" class="text-blue-600 w-4 h-4"></i> Opret kalenderaktivitet</button>
+                            <button onclick="openAdminCreate('videos')" class="w-full text-left p-3 bg-white border border-slate-100 rounded-xl text-xs font-bold flex items-center gap-2 text-slate-700 shadow-2xs"><i data-lucide="plus-circle" class="text-blue-600 w-4 h-4"></i> Opret video-link</button>
+                        </div>
+
+                        <div id="admin-form-container" class="hidden bg-white p-4 rounded-2xl border-2 border-amber-300 space-y-3 shadow-md">
+                            <!-- Dynamisk form indlæses her via JS -->
+                        </div>
+
+                        <div class="text-[11px] text-slate-400 bg-slate-100 p-3 rounded-xl leading-relaxed">
+                            <strong>Database Status:</strong> Ændringer gemmes i enhedens <code>localStorage</code>. <br><br>
+                            <em>💡 CLOUD SYNC TIP: For at lade flere redigere online på tværs af enheder, kan du erstatte <code>localStorage.getItem/setItem</code> med API-kald til f.eks. <strong>Supabase</strong> eller <strong>Firebase Store</strong> lige her i scriptet.</em>
+                        </div>
+                    </div>
+                `;
+            }
+
+            // Standard visning af statiske tekst-sider
+            return `<div class="prose prose-slate text-sm leading-relaxed text-slate-700">${formatText(staticPages[subPageId] || 'Indhold er under udarbejdelse.')}</div>`;
+        }
+
+        // --- ADMIN FUNKTIONER OG LOGIN ---
+        function checkAdminPassword() {
+            const input = document.getElementById('admin-pass-input').value;
+            if (input === '2026') { // Kodebeskyttelse: 2026 (Punkt 8)
+                isAdminLoggedIn = true;
+                renderApp();
+            } else {
+                document.getElementById('admin-err-msg').classList.remove('hidden');
+            }
+        }
+
+        function deleteItem(type, id) {
+            if(confirm('Er du sikker på, at du vil slette dette element?')) {
+                let list = getData('vs_' + type);
+                list = list.filter(item => item.id !== id);
+                setData('vs_' + type, list);
+                renderApp();
+            }
+        }
+
+        // Formular til Nyheder, Kalender og Videoer
+        function openAdminCreate(type) {
+            editingItemType = type;
+            editingItemId = null;
+            showForm(type, {});
+        }
+
+        function openAdminEdit(type, id) {
+            editingItemType = type;
+            editingItemId = id;
+            const list = getData('vs_' + type);
+            const item = list.find(i => i.id === id);
+            
+            // Hvis det er en nyhed/event/video, hop til admin fane for at udføre det
+            openSubPage('admin', 'Admin');
+            showForm(type, item);
+        }
+
+        function openAdminStaticEdit(pageId, title) {
+            editingItemType = 'static';
+            editingItemId = pageId;
+            const staticPages = getData('vs_static_pages');
+            
+            openSubPage('admin', 'Admin');
+            showForm('static', { text: staticPages[pageId], title: title });
+        }
+
+        function openAdminContactEdit() {
+            editingItemType = 'contact';
+            const contactData = getData('vs_contact');
+            openSubPage('admin', 'Admin');
+            showForm('contact', contactData);
+        }
+
+        function showForm(type, item) {
+            const container = document.getElementById('admin-form-container');
+            container.classList.remove('hidden');
+            
+            let formHtml = `<h5 class="font-bold text-sm text-slate-900 border-b pb-1 mb-2">${editingItemId ? 'Rediger' : 'Opret'} ${type === 'news' ? 'Nyhed' : type === 'events' ? 'Aktivitet' : type === 'videos' ? 'Video' : 'Indhold'}</h5>`;
+
+            if (type === 'news') {
+                formHtml += `
+                    <div><label class="block text-[11px] font-bold text-slate-500">Titel</label><input type="text" id="f-title" value="${item.title || ''}" class="w-full p-2 border border-slate-200 rounded-lg text-xs mt-0.5"></div>
+                    <div><label class="block text-[11px] font-bold text-slate-500">Kategori</label><input type="text" id="f-category" value="${item.category || 'Politik'}" class="w-full p-2 border border-slate-200 rounded-lg text-xs mt-0.5"></div>
+                    <div><label class="block text-[11px] font-bold text-slate-500">Dato (ÅÅÅÅ-MM-DD)</label><input type="date" id="f-date" value="${item.date || '2026-07-05'}" class="w-full p-2 border border-slate-200 rounded-lg text-xs mt-0.5"></div>
+                    <div><label class="block text-[11px] font-bold text-slate-500">Kort tekst</label><textarea id="f-text" rows="3" class="w-full p-2 border border-slate-200 rounded-lg text-xs mt-0.5">${item.text || ''}</textarea></div>
+                    <div><label class="block text-[11px] font-bold text-slate-500">Billede URL</label><input type="text" id="f-image" value="${item.image || ''}" class="w-full p-2 border border-slate-200 rounded-lg text-xs mt-0.5" placeholder="https://..."></div>
+                `;
+            } else if (type === 'events') {
+                formHtml += `
+                    <div><label class="block text-[11px] font-bold text-slate-500">Titel</label><input type="text" id="f-title" value="${item.title || ''}" class="w-full p-2 border border-slate-200 rounded-lg text-xs mt-0.5"></div>
+                    <div><label class="block text-[11px] font-bold text-slate-500">Dato (ÅÅÅÅ-MM-DD)</label><input type="date" id="f-date" value="${item.date || '2026-08-01'}" class="w-full p-2 border border-slate-200 rounded-lg text-xs mt-0.5"></div>
+                    <div><label class="block text-[11px] font-bold text-slate-500">Tidspunkt</label><input type="text" id="f-time" value="${item.time || '19:00'}" class="w-full p-2 border border-slate-200 rounded-lg text-xs mt-0.5" placeholder="f.eks. 19:00"></div>
+                    <div><label class="block text-[11px] font-bold text-slate-500">Sted</label><input type="text" id="f-location" value="${item.location || ''}" class="w-full p-2 border border-slate-200 rounded-lg text-xs mt-0.5"></div>
+                    <div><label class="block text-[11px] font-bold text-slate-500">Kort beskrivelse</label><textarea id="f-desc" rows="2" class="w-full p-2 border border-slate-200 rounded-lg text-xs mt-0.5">${item.desc || ''}</textarea></div>
+                `;
+            } else if (type === 'videos') {
+                formHtml += `
+                    <div><label class="block text-[11px] font-bold text-slate-500">Titel</label><input type="text" id="f-title" value="${item.title || ''}" class="w-full p-2 border border-slate-200 rounded-lg text-xs mt-0.5"></div>
+                    <div><label class="block text-[11px] font-bold text-slate-500">Beskrivelse</label><input type="text" id="f-desc" value="${item.desc || ''}" class="w-full p-2 border border-slate-200 rounded-lg text-xs mt-0.5"></div>
+                    <div><label class="block text-[11px] font-bold text-slate-500">YouTube-link eller video-URL</label><input type="text" id="f-url" value="${item.url || ''}" class="w-full p-2 border border-slate-200 rounded-lg text-xs mt-0.5"></div>
+                    <div><label class="block text-[11px] font-bold text-slate-500">Thumbnail / Billede-URL</label><input type="text" id="f-image" value="${item.image || ''}" class="w-full p-2 border border-slate-200 rounded-lg text-xs mt-0.5"></div>
+                    <div class="flex items-center gap-2 mt-2"><input type="checkbox" id="f-main" ${item.main ? 'checked' : ''} class="rounded text-blue-600"><label class="text-xs text-slate-600 font-medium">Sæt som fremhævet video i top</label></div>
+                `;
+            } else if (type === 'static') {
+                formHtml += `
+                    <p class="text-[10px] text-slate-400 mb-2">Redigerer indholdet af fanen: <strong>${item.title}</strong></p>
+                    <div><textarea id="f-static-text" rows="8" class="w-full p-2 border border-slate-200 rounded-lg text-xs font-mono mt-0.5">${item.text || ''}</textarea></div>
+                `;
+            } else if (type === 'contact') {
+                formHtml += `
+                    <div><label class="block text-[11px] font-bold text-slate-500">Kontakttekst</label><textarea id="f-c-text" rows="3" class="w-full p-2 border border-slate-200 rounded-lg text-xs mt-0.5">${item.text || ''}</textarea></div>
+                    <div><label class="block text-[11px] font-bold text-slate-500">E-mail</label><input type="text" id="f-c-email" value="${item.email || ''}" class="w-full p-2 border border-slate-200 rounded-lg text-xs mt-0.5"></div>
+                    <div><label class="block text-[11px] font-bold text-slate-500">Hjemmeside</label><input type="text" id="f-c-website" value="${item.website || ''}" class="w-full p-2 border border-slate-200 rounded-lg text-xs mt-0.5"></div>
+                `;
+            }
+
+            formHtml += `
+                <div class="flex gap-2 justify-end pt-2">
+                    <button onclick="document.getElementById('admin-form-container').classList.add('hidden')" class="text-xs font-semibold bg-slate-100 text-slate-600 px-3 py-1.5 rounded-lg">Annuller</button>
+                    <button onclick="saveAdminForm()" class="text-xs font-bold text-white px-4 py-1.5 rounded-lg" style="background-color: ${COLORS.primaryBlue}">Gem ændringer</button>
+                </div>
+            `;
+            container.innerHTML = formHtml;
+        }
+
+        function saveAdminForm() {
+            const type = editingItemType;
+            
+            if (type === 'static') {
+                const text = document.getElementById('f-static-text').value;
+                const staticPages = getData('vs_static_pages');
+                staticPages[editingItemId] = text;
+                setData('vs_static_pages', staticPages);
+                openSubPage(editingItemId, subPageTitle);
+                return;
+            }
+
+            if (type === 'contact') {
+                const contactData = {
+                    text: document.getElementById('f-c-text').value,
+                    email: document.getElementById('f-c-email').value,
+                    website: document.getElementById('f-c-website').value
+                };
+                setData('vs_contact', contactData);
+                openSubPage('kontakt', 'Kontakt');
+                return;
+            }
+
+            // For lister: news, events, videos
+            let list = getData('vs_' + type) || [];
+            
+            let obj = {};
+            if (editingItemId) {
+                obj = list.find(i => i.id === editingItemId);
+            } else {
+                obj.id = Date.now(); // Simpelt unikt ID
+            }
+
+            if (type === 'news') {
+                obj.title = document.getElementById('f-title').value;
+                obj.category = document.getElementById('f-category').value;
+                obj.date = document.getElementById('f-date').value;
+                obj.text = document.getElementById('f-text').value;
+                obj.image = document.getElementById('f-image').value;
+            } else if (type === 'events') {
+                obj.title = document.getElementById('f-title').value;
+                obj.date = document.getElementById('f-date').value;
+                obj.time = document.getElementById('f-time').value;
+                obj.location = document.getElementById('f-location').value;
+                obj.desc = document.getElementById('f-desc').value;
+            } else if (type === 'videos') {
+                obj.title = document.getElementById('f-title').value;
+                obj.desc = document.getElementById('f-desc').value;
+                obj.url = document.getElementById('f-url').value;
+                obj.image = document.getElementById('f-image').value;
+                obj.main = document.getElementById('f-main').checked;
+                
+                // Hvis den er sat til main, fjern main fra alle andre videoer
+                if (obj.main) {
+                    list.forEach(v => { if(v.id !== obj.id) v.main = false; });
+                }
+            }
+
+            if (!editingItemId) {
+                list.unshift(obj); // Tilføj øverst ved nyoprettelse
+            }
+
+            setData('vs_' + type, list);
+            document.getElementById('admin-form-container').classList.add('hidden');
+            
+            // Gå tilbage til den relevante fane
+            if(type === 'news') switchTab('nyt');
+            else if(type === 'events') switchTab('kalender');
+            else if(type === 'videos') switchTab('video');
+        }
+
+        function switchTab(tabId) {
+            currentTab = tabId;
+            renderApp();
+        }
+
+        // Initialisering ved indlæsning
+        initData();
+        renderApp();
+    </script>
+</body>
+</html>
