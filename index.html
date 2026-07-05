@@ -4,6 +4,18 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Venstre Syddjurs</title>
+    <meta name="description" content="Officiel app for Venstre Syddjurs – nyheder, kalender, video og mærkesager.">
+    <meta name="theme-color" content="#1D4ED8">
+
+    <!-- PWA -->
+    <link rel="manifest" href="./manifest.json">
+    <link rel="icon" type="image/png" sizes="192x192" href="./icon-192.png">
+    <link rel="icon" type="image/png" sizes="512x512" href="./icon-512.png">
+    <link rel="apple-touch-icon" href="./icon-192.png">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Venstre Syddjurs">
+
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Lucide Icons -->
@@ -1377,27 +1389,8 @@
     <script>
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
-                // Inline generation minimal placeholder to make it PWA installable setup compliant
-                const swContent = `
-                    const CACHE_NAME = 'v-syddjurs-pwa-v1';
-                    const ASSETS = [
-                        './',
-                        './index.html',
-                        'https://cdn.tailwindcss.com',
-                        'https://unpkg.com/lucide@latest'
-                    ];
-                    self.addEventListener('install', e => {
-                        e.waitUntil(caches.open(CACHE_NAME).then(cache => cache.addAll(ASSETS)));
-                    });
-                    self.addEventListener('fetch', e => {
-                        e.respondWith(caches.match(e.request).then(res => res || fetch(e.request)));
-                    });
-                `;
-                const blob = new Blob([swContent], { type: 'application/javascript' });
-                const swUrl = URL.createObjectURL(blob);
-                
-                navigator.serviceWorker.register(swUrl)
-                    .then(reg => console.log('Service Worker registreret succesfuldt.'))
+                navigator.serviceWorker.register('./sw.js')
+                    .then(reg => console.log('Service Worker registreret succesfuldt.', reg.scope))
                     .catch(err => console.log('Service Worker fejl under registrering:', err));
             });
         }
